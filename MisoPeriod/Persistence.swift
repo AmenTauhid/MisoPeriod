@@ -15,8 +15,9 @@ struct PersistenceController {
         let result = PersistenceController(inMemory: true)
         let viewContext = result.container.viewContext
         for _ in 0..<10 {
-            let newItem = Item(context: viewContext)
-            newItem.timestamp = Date()
+            let newPeriod = PeriodEntry(context: viewContext)
+            newPeriod.startDate = Date()
+            newPeriod.flow = "Medium"
         }
         do {
             try viewContext.save()
