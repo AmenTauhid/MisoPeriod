@@ -153,27 +153,6 @@ struct SettingsView: View {
                             
                             Divider()
                             
-                            Button(action: openPrivacyPolicy) {
-                                HStack {
-                                    Image(systemName: "hand.raised")
-                                        .foregroundColor(KawaiiTheme.deepPink)
-                                    
-                                    Text("Privacy Policy")
-                                        .font(KawaiiTheme.bodyFont)
-                                        .foregroundColor(.primary)
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding(.vertical, 8)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            Divider()
-                            
                             HStack {
                                 Text("Version 1.0.0")
                                     .font(KawaiiTheme.captionFont)
@@ -209,10 +188,6 @@ struct SettingsView: View {
         .sheet(isPresented: $showingAbout) {
             AboutSheet()
         }
-    }
-    
-    private func openPrivacyPolicy() {
-        // TODO: Open privacy policy URL
     }
 }
 
@@ -289,7 +264,7 @@ struct SettingsStepperRow: View {
             Spacer()
             
             HStack(spacing: 12) {
-                Button(action: { 
+                Button(action: {
                     if value > range.lowerBound {
                         value -= 1
                     }
@@ -304,7 +279,7 @@ struct SettingsStepperRow: View {
                     .foregroundColor(.primary)
                     .frame(minWidth: 80)
                 
-                Button(action: { 
+                Button(action: {
                     if value < range.upperBound {
                         value += 1
                     }
@@ -392,10 +367,18 @@ struct AboutSheet: View {
                         }
                     }
                     
-                    Text("Your data stays on your device. We believe your health information should be private and secure.")
-                        .font(KawaiiTheme.captionFont)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
+                    // Sweet personalized note
+                    KawaiiCard(backgroundColor: KawaiiTheme.lightLavender) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("For You \(KawaiiEmojis.heart)")
+                                .font(KawaiiTheme.headlineFont)
+                                .foregroundColor(KawaiiTheme.deepPink)
+                            Text("This app was made especially for you — a gentle little helper to honor your cycle, your comfort, and your wellbeing. You mean so much, and your health matters deeply. I hope these soft colors, simple logs, and caring details make tracking feel supportive, never stressful. Thank you for being you. You are loved — always, fully, endlessly. \(KawaiiEmojis.flower) \(KawaiiEmojis.sparkles)")
+                                .font(KawaiiTheme.bodyFont)
+                                .foregroundColor(.primary)
+                                .multilineTextAlignment(.leading)
+                        }
+                    }
                     
                     Spacer()
                 }

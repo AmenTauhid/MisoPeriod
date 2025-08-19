@@ -12,13 +12,15 @@ struct AddPeriodView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.presentationMode) var presentationMode
     
+    // Editing support
+    let periodToEdit: PeriodEntry?
+    
     @State private var startDate = Date()
     @State private var endDate: Date?
     @State private var hasEndDate = false
     @State private var selectedFlow = "Light"
     @State private var selectedMood = ""
     @State private var symptoms: [String] = []
-    @State private var notes = ""
     
     private let flowOptions = ["Light", "Medium", "Heavy"]
     private let moodOptions = [
@@ -37,17 +39,29 @@ struct AddPeriodView: View {
         ("Breast Tenderness", KawaiiEmojis.tender)
     ]
     
+    init(periodToEdit: PeriodEntry? = nil) {
+        self.periodToEdit = periodToEdit
+        if let p = periodToEdit {
+            _startDate = State(initialValue: p.startDate ?? Date())
+            _endDate = State(initialValue: p.endDate)
+            _hasEndDate = State(initialValue: p.endDate != nil)
+            _selectedFlow = State(initialValue: p.flow ?? "Light")
+            _selectedMood = State(initialValue: p.mood ?? "")
+            if let s = p.symptoms as? [String] { _symptoms = State(initialValue: s) }
+        }
+    }
+    
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
                     // Header
                     VStack(spacing: 8) {
-                        Text("\(KawaiiEmojis.flower) Log Your Period")
+                        Text("\(KawaiiEmojis.flower) \(periodToEdit == nil ? "Log Your Period" : "Edit Period")")
                             .font(KawaiiTheme.titleFont)
                             .foregroundColor(KawaiiTheme.deepPink)
                         
-                        Text("Help me track your beautiful cycle")
+                        Text(periodToEdit == nil ? "Help me track your beautiful cycle" : "Update your period entry")
                             .font(KawaiiTheme.bodyFont)
                             .foregroundColor(.secondary)
                     }
@@ -111,8 +125,8 @@ struct AddPeriodView: View {
                                             .padding(.horizontal, 16)
                                             .padding(.vertical, 8)
                                             .background(
-                                                selectedFlow == flow ? 
-                                                KawaiiTheme.peach : 
+                                                selectedFlow == flow ?
+                                                KawaiiTheme.peach :
                                                 KawaiiTheme.peach.opacity(0.2)
                                             )
                                             .clipShape(Capsule())
@@ -135,8 +149,8 @@ struct AddPeriodView: View {
                                 GridItem(.flexible())
                             ], spacing: 8) {
                                 ForEach(moodOptions, id: \.0) { mood in
-                                    Button(action: { 
-                                        selectedMood = selectedMood == mood.0 ? "" : mood.0 
+                                    Button(action: {
+                                        selectedMood = selectedMood == mood.0 ? "" : mood.0
                                     }) {
                                         VStack(spacing: 4) {
                                             Text(mood.1)
@@ -148,8 +162,8 @@ struct AddPeriodView: View {
                                         .padding(.vertical, 8)
                                         .frame(maxWidth: .infinity)
                                         .background(
-                                            selectedMood == mood.0 ? 
-                                            KawaiiTheme.mintGreen : 
+                                            selectedMood == mood.0 ?
+                                            KawaiiTheme.mintGreen :
                                             KawaiiTheme.mintGreen.opacity(0.2)
                                         )
                                         .clipShape(RoundedRectangle(cornerRadius: KawaiiTheme.smallCornerRadius))
@@ -171,7 +185,7 @@ struct AddPeriodView: View {
                                 GridItem(.flexible())
                             ], spacing: 8) {
                                 ForEach(symptomOptions, id: \.0) { symptom in
-                                    Button(action: { 
+                                    Button(action: {
                                         if symptoms.contains(symptom.0) {
                                             symptoms.removeAll { $0 == symptom.0 }
                                         } else {
@@ -187,8 +201,8 @@ struct AddPeriodView: View {
                                         .padding(.vertical, 8)
                                         .frame(maxWidth: .infinity)
                                         .background(
-                                            symptoms.contains(symptom.0) ? 
-                                            KawaiiTheme.primaryPink : 
+                                            symptoms.contains(symptom.0) ?
+                                            KawaiiTheme.primaryPink :
                                             KawaiiTheme.primaryPink.opacity(0.2)
                                         )
                                         .clipShape(RoundedRectangle(cornerRadius: KawaiiTheme.smallCornerRadius))
@@ -198,27 +212,10 @@ struct AddPeriodView: View {
                         }
                     }
                     
-                    // Notes
-                    KawaiiCard(backgroundColor: KawaiiTheme.cream) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Notes \(KawaiiEmojis.cherry)")
-                                .font(KawaiiTheme.headlineFont)
-                                .foregroundColor(KawaiiTheme.deepPink)
-                            
-                            TextField("How are you feeling today? Any special notes?", text: $notes, axis: .vertical)
-                                .textFieldStyle(PlainTextFieldStyle())
-                                .font(KawaiiTheme.bodyFont)
-                                .lineLimit(3...6)
-                                .padding()
-                                .background(Color.white)
-                                .clipShape(RoundedRectangle(cornerRadius: KawaiiTheme.smallCornerRadius))
-                        }
-                    }
-                    
                     // Save Button
                     Button(action: savePeriod) {
                         HStack {
-                            Text("\(KawaiiEmojis.sparkles) Save Period \(KawaiiEmojis.sparkles)")
+                            Text("\(KawaiiEmojis.sparkles) \(periodToEdit == nil ? "Save Period" : "Update Period") \(KawaiiEmojis.sparkles)")
                                 .font(KawaiiTheme.bodyFont)
                                 .fontWeight(.semibold)
                         }
@@ -226,6 +223,14 @@ struct AddPeriodView: View {
                     }
                     .buttonStyle(KawaiiButtonStyle())
                     .padding(.horizontal)
+                    
+                    if periodToEdit != nil {
+                        Button(role: .destructive, action: deletePeriod) {
+                            Text("Delete Entry").frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(KawaiiButtonStyle(backgroundColor: .red.opacity(0.9)))
+                        .padding(.horizontal)
+                    }
                     
                     Spacer(minLength: 50)
                 }
@@ -253,13 +258,12 @@ struct AddPeriodView: View {
     
     private func savePeriod() {
         withAnimation {
-            let newPeriod = PeriodEntry(context: viewContext)
-            newPeriod.startDate = startDate
-            newPeriod.endDate = hasEndDate ? endDate : nil
-            newPeriod.flow = selectedFlow
-            newPeriod.mood = selectedMood.isEmpty ? nil : selectedMood
-            newPeriod.symptoms = symptoms.isEmpty ? nil : symptoms as NSObject
-            newPeriod.notes = notes.isEmpty ? nil : notes
+            let period = periodToEdit ?? PeriodEntry(context: viewContext)
+            period.startDate = startDate
+            period.endDate = hasEndDate ? endDate : nil
+            period.flow = selectedFlow
+            period.mood = selectedMood.isEmpty ? nil : selectedMood
+            period.symptoms = symptoms.isEmpty ? nil : symptoms as NSObject
             
             do {
                 try viewContext.save()
@@ -269,6 +273,13 @@ struct AddPeriodView: View {
                 fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
             }
         }
+    }
+    
+    private func deletePeriod() {
+        guard let p = periodToEdit else { return }
+        viewContext.delete(p)
+        try? viewContext.save()
+        presentationMode.wrappedValue.dismiss()
     }
 }
 
