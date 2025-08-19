@@ -117,7 +117,9 @@ struct HomeView: View {
     private var currentCycleDay: Int {
         guard let lastPeriod = periods.first, let start = lastPeriod.startDate else { return 1 }
         let daysSinceLastPeriod = Calendar.current.dateComponents([.day], from: start, to: Date()).day ?? 0
-        return max(1, daysSinceLastPeriod + 1)
+        let cycleDay = max(1, daysSinceLastPeriod + 1)
+        // Clamp the cycle day to the average cycle length to prevent out-of-bounds errors
+        return min(cycleDay, averageCycleLength > 0 ? averageCycleLength : 1)
     }
     
     private var averageCycleLength: Int { calculateAverageCycleLength() }
