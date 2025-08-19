@@ -6,16 +6,29 @@
 //
 
 import SwiftUI
+import UserNotifications
 
 struct SettingsView: View {
+    @EnvironmentObject var notificationManager: NotificationManager
+    @Environment(\.managedObjectContext) private var viewContext
+    
     @AppStorage("reminderEnabled") private var reminderEnabled = true
     @AppStorage("reminderDaysBefore") private var reminderDaysBefore = 3
+    @AppStorage("ovulationReminders") private var ovulationReminders = true
+    @AppStorage("dailyLogReminders") private var dailyLogReminders = false
+    @AppStorage("dailyLogTime") private var dailyLogTime = 20
+    @AppStorage("periodEndReminders") private var periodEndReminders = true
     @AppStorage("averageCycleLength") private var averageCycleLength = 28
     @AppStorage("averagePeriodLength") private var averagePeriodLength = 5
     @AppStorage("enableHealthTips") private var enableHealthTips = true
     
     @State private var showingExportSheet = false
     @State private var showingAbout = false
+    
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \PeriodEntry.startDate, ascending: false)],
+        animation: .default)
+    private var periods: FetchedResults<PeriodEntry>
     
     var body: some View {
         NavigationView {
@@ -34,20 +47,112 @@ struct SettingsView: View {
                     .padding(.top)
                     
                     // Notifications Section
-                    SettingsSection(title: "Notifications \(KawaiiEmojis.heart)", backgroundColor: KawaiiTheme.lightPink) {
+                    SettingsSection(title: "Notifications \(KawaiiEmojis.notification)", backgroundColor: KawaiiTheme.lightPink) {
                         VStack(spacing: 16) {
-                            SettingsToggleRow(
-                                title: "Period Reminders",
-                                description: "Get notified before your next period",
-                                isOn: $reminderEnabled
-                            )
+                            // Notification Permission Status
+                            HStack {
+                                Image(systemName: notificationManager.isAuthorized ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                    .foregroundColor(notificationManager.isAuthorized ? .green : .orange)
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Notification Permission")
+                                        .font(KawaiiTheme.bodyFont)
+                                        .foregroundColor(.primary)
+                                    Text(notificationManager.isAuthorized ? "Enabled" : "Tap to enable notifications")
+                                        .font(KawaiiTheme.captionFont)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                if !notificationManager.isAuthorized {
+                                    Button("Enable") {
+                                        Task {
+                                            await notificationManager.requestPermission()
+                                        }
+                                    }
+                                    .font(KawaiiTheme.captionFont)
+                                    .foregroundColor(KawaiiTheme.deepPink)
+                                }
+                            }
+                            .padding(.vertical, 8)
                             
-                            if reminderEnabled {
-                                SettingsStepperRow(
-                                    title: "Remind me",
-                                    value: $reminderDaysBefore,
-                                    range: 1...7,
-                                    suffix: "days before"
+                            if notificationManager.isAuthorized {
+                                Divider()
+                                
+                                SettingsToggleRow(
+                                    title: "Period Reminders",
+                                    description: "Get notified before your next period",
+                                    isOn: $reminderEnabled
+                                )
+                                .onChange(of: reminderEnabled) { _ in
+                                    updateNotifications()
+                                }
+                                
+                                if reminderEnabled {
+                                    SettingsStepperRow(
+                                        title: "Remind me",
+                                        value: $reminderDaysBefore,
+                                        range: 1...7,
+                                        suffix: "days before"
+                                    )
+                                    .onChange(of: reminderDaysBefore) { _ in
+                                        updateNotifications()
+                                    }
+                                }
+                                
+                                Divider()
+                                
+                                SettingsToggleRow(
+                                    title: "Ovulation Reminders",
+                                    description: "Get notified during fertile window",
+                                    isOn: $ovulationReminders
+                                )
+                                .onChange(of: ovulationReminders) { _ in
+                                    updateNotifications()
+                                }
+                                
+                                Divider()
+                                
+                                SettingsToggleRow(
+                                    title: "Daily Log Reminders",
+                                    description: "Remind me to log mood and symptoms",
+                                    isOn: $dailyLogReminders
+                                )
+                                .onChange(of: dailyLogReminders) { enabled in
+                                    if enabled {
+                                        notificationManager.scheduleDailyLogReminder(at: dailyLogTime)
+                                    } else {
+                                        notificationManager.cancelNotifications(withIdentifier: "daily_log")
+                                    }
+                                }
+                                
+                                if dailyLogReminders {
+                                    SettingsStepperRow(
+                                        title: "Daily reminder time",
+                                        value: $dailyLogTime,
+                                        range: 6...23,
+                                        suffix: ":00",
+                                        formatter: { hour in
+                                            let formatter = DateFormatter()
+                                            formatter.dateFormat = "h a"
+                                            let date = Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: Date()) ?? Date()
+                                            return formatter.string(from: date)
+                                        }
+                                    )
+                                    .onChange(of: dailyLogTime) { _ in
+                                        if dailyLogReminders {
+                                            notificationManager.scheduleDailyLogReminder(at: dailyLogTime)
+                                        }
+                                    }
+                                }
+                                
+                                Divider()
+                                
+                                SettingsToggleRow(
+                                    title: "Period End Check",
+                                    description: "Remind me to update when period ends",
+                                    isOn: $periodEndReminders
                                 )
                             }
                         }
@@ -62,6 +167,9 @@ struct SettingsView: View {
                                 range: 21...45,
                                 suffix: "days"
                             )
+                            .onChange(of: averageCycleLength) { _ in
+                                updateNotifications()
+                            }
                             
                             SettingsStepperRow(
                                 title: "Average Period Length",
@@ -69,6 +177,9 @@ struct SettingsView: View {
                                 range: 1...10,
                                 suffix: "days"
                             )
+                            .onChange(of: averagePeriodLength) { _ in
+                                updateNotifications()
+                            }
                         }
                     }
                     
@@ -107,25 +218,24 @@ struct SettingsView: View {
                             
                             Divider()
                             
-                            Button(action: { }) {
+                            Button(action: openSystemNotificationSettings) {
                                 HStack {
-                                    Image(systemName: "icloud")
+                                    Image(systemName: "gear")
                                         .foregroundColor(KawaiiTheme.deepPink)
                                     
-                                    Text("iCloud Sync")
+                                    Text("System Notification Settings")
                                         .font(KawaiiTheme.bodyFont)
                                         .foregroundColor(.primary)
                                     
                                     Spacer()
                                     
-                                    Text("Coming Soon")
-                                        .font(KawaiiTheme.captionFont)
+                                    Image(systemName: "arrow.up.right")
+                                        .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
                                 .padding(.vertical, 8)
                             }
                             .buttonStyle(PlainButtonStyle())
-                            .disabled(true)
                         }
                     }
                     
@@ -138,27 +248,6 @@ struct SettingsView: View {
                                         .foregroundColor(KawaiiTheme.deepPink)
                                     
                                     Text("About MisoPeriod")
-                                        .font(KawaiiTheme.bodyFont)
-                                        .foregroundColor(.primary)
-                                    
-                                    Spacer()
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding(.vertical, 8)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            Divider()
-                            
-                            Button(action: openPrivacyPolicy) {
-                                HStack {
-                                    Image(systemName: "hand.raised")
-                                        .foregroundColor(KawaiiTheme.deepPink)
-                                    
-                                    Text("Privacy Policy")
                                         .font(KawaiiTheme.bodyFont)
                                         .foregroundColor(.primary)
                                     
@@ -209,13 +298,35 @@ struct SettingsView: View {
         .sheet(isPresented: $showingAbout) {
             AboutSheet()
         }
+        .onAppear {
+            notificationManager.checkAuthorizationStatus()
+        }
+        .onChange(of: notificationManager.isAuthorized) { authorized in
+            if authorized {
+                updateNotifications()
+            }
+        }
     }
     
-    private func openPrivacyPolicy() {
-        // TODO: Open privacy policy URL
+    private func updateNotifications() {
+        guard notificationManager.isAuthorized && reminderEnabled else { return }
+        
+        let periodsArray = Array(periods)
+        notificationManager.updateNotificationsBasedOnData(
+            periods: periodsArray,
+            cycleLength: averageCycleLength,
+            periodLength: averagePeriodLength
+        )
+    }
+    
+    private func openSystemNotificationSettings() {
+        if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(settingsUrl)
+        }
     }
 }
 
+// Enhanced Settings Components
 struct SettingsSection<Content: View>: View {
     let title: String
     let backgroundColor: Color
@@ -253,24 +364,26 @@ struct SettingsToggleRow: View {
     }
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(KawaiiTheme.bodyFont)
-                    .foregroundColor(.primary)
-                
-                if let description = description {
-                    Text(description)
-                        .font(KawaiiTheme.captionFont)
-                        .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(KawaiiTheme.bodyFont)
+                        .foregroundColor(.primary)
+                    if let description = description {
+                        Text(description)
+                            .font(KawaiiTheme.captionFont)
+                            .foregroundColor(.secondary)
+                    }
                 }
+                
+                Spacer()
+                
+                Toggle("", isOn: $isOn)
+                    .toggleStyle(SwitchToggleStyle(tint: KawaiiTheme.primaryPink))
             }
-            
-            Spacer()
-            
-            Toggle("", isOn: $isOn)
-                .toggleStyle(SwitchToggleStyle(tint: KawaiiTheme.primaryPink))
         }
+        .padding(.vertical, 4)
     }
 }
 
@@ -279,6 +392,15 @@ struct SettingsStepperRow: View {
     @Binding var value: Int
     let range: ClosedRange<Int>
     let suffix: String
+    let formatter: ((Int) -> String)?
+    
+    init(title: String, value: Binding<Int>, range: ClosedRange<Int>, suffix: String, formatter: ((Int) -> String)? = nil) {
+        self.title = title
+        self._value = value
+        self.range = range
+        self.suffix = suffix
+        self.formatter = formatter
+    }
     
     var body: some View {
         HStack {
@@ -289,76 +411,60 @@ struct SettingsStepperRow: View {
             Spacer()
             
             HStack(spacing: 12) {
-                Button(action: { 
+                Button(action: {
                     if value > range.lowerBound {
                         value -= 1
                     }
                 }) {
                     Image(systemName: "minus.circle.fill")
                         .foregroundColor(value > range.lowerBound ? KawaiiTheme.primaryPink : .gray)
+                        .font(.title3)
                 }
                 .disabled(value <= range.lowerBound)
                 
-                Text("\(value) \(suffix)")
+                Text(formatter?(value) ?? "\(value) \(suffix)")
                     .font(KawaiiTheme.bodyFont)
-                    .foregroundColor(.primary)
+                    .foregroundColor(KawaiiTheme.deepPink)
+                    .fontWeight(.semibold)
                     .frame(minWidth: 80)
                 
-                Button(action: { 
+                Button(action: {
                     if value < range.upperBound {
                         value += 1
                     }
                 }) {
                     Image(systemName: "plus.circle.fill")
                         .foregroundColor(value < range.upperBound ? KawaiiTheme.primaryPink : .gray)
+                        .font(.title3)
                 }
                 .disabled(value >= range.upperBound)
             }
         }
+        .padding(.vertical, 4)
     }
 }
 
+// Placeholder sheets
 struct ExportDataSheet: View {
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 24) {
-                Text("\(KawaiiEmojis.sparkles) Export Your Data")
-                    .font(KawaiiTheme.titleFont)
-                    .foregroundColor(KawaiiTheme.deepPink)
-                
-                Text("Export your period tracking data as a CSV file to use with other apps or for backup purposes.")
+            VStack {
+                Text("Export functionality coming soon!")
                     .font(KawaiiTheme.bodyFont)
                     .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-                
-                Button(action: exportData) {
-                    Text("Export as CSV")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(KawaiiButtonStyle())
-                .padding(.horizontal)
-                
-                Spacer()
             }
-            .padding()
+            .navigationTitle("Export Data")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         presentationMode.wrappedValue.dismiss()
                     }
-                    .foregroundColor(KawaiiTheme.deepPink)
                 }
             }
         }
-    }
-    
-    private func exportData() {
-        // TODO: Implement CSV export
-        presentationMode.wrappedValue.dismiss()
     }
 }
 
@@ -368,46 +474,41 @@ struct AboutSheet: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 24) {
-                    Text("\(KawaiiEmojis.cherry) MisoPeriod")
+                VStack(spacing: 20) {
+                    Text("\(KawaiiEmojis.sparkles) MisoPeriod")
                         .font(KawaiiTheme.titleFont)
                         .foregroundColor(KawaiiTheme.deepPink)
                     
-                    Text("A kawaii period tracker designed to make cycle tracking delightful and empowering.")
+                    Text("Your kawaii period tracking companion")
                         .font(KawaiiTheme.bodyFont)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                     
-                    KawaiiCard(backgroundColor: KawaiiTheme.lightPink) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Features \(KawaiiEmojis.sparkles)")
-                                .font(KawaiiTheme.headlineFont)
-                                .foregroundColor(KawaiiTheme.deepPink)
-                            
-                            FeatureRow(emoji: KawaiiEmojis.period, text: "Easy period logging")
-                            FeatureRow(emoji: KawaiiEmojis.calendar, text: "Beautiful calendar view")
-                            FeatureRow(emoji: KawaiiEmojis.heart, text: "Mood & symptom tracking")
-                            FeatureRow(emoji: KawaiiEmojis.rainbow, text: "Cycle insights & predictions")
-                            FeatureRow(emoji: KawaiiEmojis.butterfly, text: "Privacy-focused design")
-                        }
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Features:")
+                            .font(KawaiiTheme.headlineFont)
+                            .foregroundColor(KawaiiTheme.deepPink)
+                        
+                        FeatureRow(icon: KawaiiEmojis.calendar, text: "Track your periods and cycles")
+                        FeatureRow(icon: KawaiiEmojis.heart, text: "Log moods and symptoms")
+                        FeatureRow(icon: KawaiiEmojis.notification, text: "Smart notifications")
+                        FeatureRow(icon: KawaiiEmojis.rainbow, text: "Beautiful kawaii design")
                     }
-                    
-                    Text("Your data stays on your device. We believe your health information should be private and secure.")
-                        .font(KawaiiTheme.captionFont)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
+                    .padding()
+                    .background(KawaiiTheme.lightPink.opacity(0.3))
+                    .clipShape(RoundedRectangle(cornerRadius: KawaiiTheme.cardCornerRadius))
                     
                     Spacer()
                 }
                 .padding()
             }
+            .navigationTitle("About")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         presentationMode.wrappedValue.dismiss()
                     }
-                    .foregroundColor(KawaiiTheme.deepPink)
                 }
             }
         }
@@ -415,12 +516,13 @@ struct AboutSheet: View {
 }
 
 struct FeatureRow: View {
-    let emoji: String
+    let icon: String
     let text: String
     
     var body: some View {
         HStack {
-            Text(emoji)
+            Text(icon)
+                .font(.title3)
             Text(text)
                 .font(KawaiiTheme.bodyFont)
                 .foregroundColor(.primary)
@@ -431,4 +533,6 @@ struct FeatureRow: View {
 
 #Preview {
     SettingsView()
+        .environmentObject(NotificationManager.shared)
+        .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
 }

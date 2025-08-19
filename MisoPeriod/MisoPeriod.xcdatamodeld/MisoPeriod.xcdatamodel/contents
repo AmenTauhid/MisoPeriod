@@ -4,7 +4,7 @@
         <attribute name="startDate" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="endDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="flow" attributeType="String"/>
-        <attribute name="symptoms" optional="YES" attributeType="Transformable"/>
+        <attribute name="symptoms" optional="YES" attributeType="Transformable" valueTransformerName="SymptomsTransformer"/>
         <attribute name="notes" optional="YES" attributeType="String"/>
         <attribute name="mood" optional="YES" attributeType="String"/>
     </entity>

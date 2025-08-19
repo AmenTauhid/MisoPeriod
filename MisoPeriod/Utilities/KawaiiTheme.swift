@@ -20,7 +20,7 @@ struct KawaiiTheme {
     static let peach = Color(red: 1.0, green: 0.8, blue: 0.7)
     static let lightPeach = Color(red: 1.0, green: 0.9, blue: 0.85)
     
-    static let mintGreen = Color(red: 0.7, green: 1.0, blue: 0.85)
+    static let mintGreen = Color(red: 0.4, green: 0.7, blue: 0.55)
     static let lightMint = Color(red: 0.85, green: 1.0, blue: 0.92)
     
     static let cream = Color(red: 1.0, green: 0.98, blue: 0.94)
@@ -45,11 +45,15 @@ struct KawaiiTheme {
         endPoint: .bottomTrailing
     )
     
-    // Typography
-    static let titleFont = Font.system(size: 24, weight: .bold, design: .rounded)
-    static let headlineFont = Font.system(size: 18, weight: .semibold, design: .rounded)
-    static let bodyFont = Font.system(size: 16, weight: .medium, design: .rounded)
-    static let captionFont = Font.system(size: 12, weight: .regular, design: .rounded)
+    // Typography - Updated for better readability
+    static let titleFont = Font.system(size: 28, weight: .bold, design: .rounded)
+    static let headlineFont = Font.system(size: 20, weight: .semibold, design: .rounded)
+    static let bodyFont = Font.system(size: 17, weight: .medium, design: .default)
+    static let captionFont = Font.system(size: 14, weight: .regular, design: .default)
+    
+    // Additional font sizes for better hierarchy
+    static let largeBodyFont = Font.system(size: 18, weight: .medium, design: .default)
+    static let smallBodyFont = Font.system(size: 15, weight: .regular, design: .default)
     
     // Corner radius
     static let cardCornerRadius: CGFloat = 16

@@ -123,9 +123,10 @@ struct CalendarView: View {
                     // Calendar Grid
                     KawaiiCard(backgroundColor: .white) {
                         VStack(spacing: 12) {
-                            // Weekday Headers
+                            // Weekday Headers (use enumerated IDs to avoid duplicate warnings for T, S)
                             HStack {
-                                ForEach(["M", "T", "W", "T", "F", "S", "S"], id: \.self) { day in
+                                let weekdayHeaders = ["M", "T", "W", "T", "F", "S", "S"]
+                                ForEach(Array(weekdayHeaders.enumerated()), id: \.0) { index, day in
                                     Text(day)
                                         .font(KawaiiTheme.captionFont)
                                         .fontWeight(.semibold)
