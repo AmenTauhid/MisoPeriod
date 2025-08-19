@@ -10,6 +10,7 @@ import CoreData
 
 struct PeriodTrackerView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @EnvironmentObject var notificationManager: NotificationManager
     
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \PeriodEntry.startDate, ascending: false)],
@@ -85,6 +86,20 @@ struct PeriodTrackerView: View {
         }
         .sheet(isPresented: $showingSymptomLog) {
             SymptomLogView()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToAddPeriod)) { _ in
+            showingAddPeriod = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToDailyLog)) { _ in
+            showingMoodLog = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToEditPeriod)) { _ in
+            if let currentPeriod = periods.first(where: { $0.endDate == nil }) {
+                editingPeriod = currentPeriod
+                showingAddPeriod = true
+            } else {
+                showingAddPeriod = true
+            }
         }
     }
 }
