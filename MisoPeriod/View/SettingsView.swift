@@ -498,6 +498,20 @@ struct AboutSheet: View {
                     .background(KawaiiTheme.lightPink.opacity(0.3))
                     .clipShape(RoundedRectangle(cornerRadius: KawaiiTheme.cardCornerRadius))
                     
+                    // Sweet personalized note
+                    KawaiiCard(backgroundColor: KawaiiTheme.lightLavender) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("For You \(KawaiiEmojis.heart)")
+                                .font(KawaiiTheme.headlineFont)
+                                .foregroundColor(KawaiiTheme.deepPink)
+                            Text("This app was made especially for you — a gentle little helper to honor your cycle, your comfort, and your wellbeing. You mean so much, and your health matters deeply. I hope these soft colors, simple logs, and caring details make tracking feel supportive, never stressful. Thank you for being you. You are loved — always, fully, endlessly. \(KawaiiEmojis.flower) \(KawaiiEmojis.sparkles)")
+                                .font(KawaiiTheme.bodyFont)
+                                .foregroundColor(.primary)
+                                .multilineTextAlignment(.leading)
+                        }
+                    }
+                    
+                    
                     Spacer()
                 }
                 .padding()
