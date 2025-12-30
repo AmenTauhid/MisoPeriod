@@ -157,6 +157,16 @@ class CycleViewModel: ObservableObject {
         notes: String? = nil
     ) async {
         do {
+            var cycleForLog: Cycle? = nil
+
+            if flow.isPeriod {
+                // When logging period flow, ensure we have a cycle for this date
+                cycleForLog = try cycleService.findOrCreateCycle(for: date)
+            } else {
+                // For non-period logs, use current cycle if available
+                cycleForLog = currentCycle
+            }
+
             _ = try cycleService.createOrUpdateDailyLog(
                 date: date,
                 flowIntensity: flow,
@@ -164,7 +174,7 @@ class CycleViewModel: ObservableObject {
                 energy: energy,
                 symptoms: symptoms,
                 notes: notes,
-                cycle: currentCycle
+                cycle: cycleForLog
             )
             await loadData()
         } catch {

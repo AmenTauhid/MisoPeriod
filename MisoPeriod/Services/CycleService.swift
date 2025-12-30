@@ -64,6 +64,94 @@ class CycleService: ObservableObject {
         try saveContext()
     }
 
+    /// Create a historical cycle (not active) for logging past periods
+    func createHistoricalCycle(startDate: Date) throws -> Cycle {
+        let cycle = Cycle(context: viewContext)
+        cycle.id = UUID()
+        cycle.startDate = startDate.startOfDay
+        cycle.isActive = false // Historical cycles are not active
+
+        // Calculate estimated ovulation and fertile window based on average cycle
+        let settings = try fetchOrCreateUserSettings()
+        let avgCycleLength = Int(settings.averageCycleLength)
+        updateFertilityDates(for: cycle, cycleLength: avgCycleLength)
+
+        try saveContext()
+        return cycle
+    }
+
+    /// Find or create a cycle that covers the given date
+    func findOrCreateCycle(for date: Date) throws -> Cycle {
+        let targetDate = date.startOfDay
+
+        // First, check if there's an existing cycle that starts on this exact date
+        let allCycles = try fetchAllCycles()
+
+        for cycle in allCycles {
+            guard let cycleStart = cycle.startDate else { continue }
+
+            // Exact match - return this cycle
+            if cycleStart.isSameDay(as: targetDate) {
+                return cycle
+            }
+        }
+
+        // Check if the date falls within an existing cycle's period (first ~7 days)
+        for cycle in allCycles {
+            guard let cycleStart = cycle.startDate else { continue }
+
+            let daysSinceCycleStart = cycleStart.daysBetween(targetDate)
+
+            // If within the first 7 days of a cycle, it's part of that cycle's period
+            if daysSinceCycleStart >= 0 && daysSinceCycleStart <= 7 {
+                return cycle
+            }
+        }
+
+        // Check if this date is before all existing cycles (user logging historical period)
+        if let oldestCycle = allCycles.last,
+           let oldestStart = oldestCycle.startDate,
+           targetDate < oldestStart {
+            // Create a new historical cycle
+            return try createHistoricalCycle(startDate: targetDate)
+        }
+
+        // Check if this could be a NEW cycle (more than 18 days after last cycle start)
+        if let newestCycle = allCycles.first,
+           let newestStart = newestCycle.startDate {
+            let daysSinceLastCycle = newestStart.daysBetween(targetDate)
+
+            if daysSinceLastCycle >= 18 {
+                // This is likely a new cycle
+                // Mark the old cycle as complete
+                if newestCycle.isActive {
+                    newestCycle.isActive = false
+                    newestCycle.cycleLength = Int16(daysSinceLastCycle)
+                }
+
+                // Create a new active cycle
+                let newCycle = Cycle(context: viewContext)
+                newCycle.id = UUID()
+                newCycle.startDate = targetDate
+                newCycle.isActive = true
+
+                let settings = try fetchOrCreateUserSettings()
+                updateFertilityDates(for: newCycle, cycleLength: Int(settings.averageCycleLength))
+
+                try saveContext()
+                return newCycle
+            }
+        }
+
+        // No existing cycles at all - create the first one
+        if allCycles.isEmpty {
+            return try createHistoricalCycle(startDate: targetDate)
+        }
+
+        // Default: associate with the most recent cycle
+        return allCycles.first!
+    }
+
     // MARK: - Daily Log Operations
 
     func createOrUpdateDailyLog(
