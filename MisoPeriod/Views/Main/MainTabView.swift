@@ -18,7 +18,7 @@ struct MainTabView: View {
                 }
                 .tag(1)
 
-            InsightsView(viewModel: cycleViewModel)
+            MisoInsightsView(viewModel: cycleViewModel)
                 .tabItem {
                     Label("Insights", systemImage: "chart.line.uptrend.xyaxis")
                 }
@@ -34,34 +34,7 @@ struct MainTabView: View {
     }
 }
 
-// MARK: - Placeholder Views (to be implemented)
-
-struct InsightsView: View {
-    @ObservedObject var viewModel: CycleViewModel
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.misoBgPrimary.ignoresSafeArea()
-
-                VStack(spacing: 20) {
-                    Image(systemName: "chart.line.uptrend.xyaxis")
-                        .font(.system(size: 60))
-                        .foregroundColor(.misoAccent.opacity(0.5))
-
-                    Text("Insights Coming Soon")
-                        .font(.misoTitle2)
-                        .foregroundColor(.misoTextSecondary)
-
-                    Text("Understand your patterns")
-                        .font(.misoBody)
-                        .foregroundColor(.misoTextTertiary)
-                }
-            }
-            .navigationTitle("Insights")
-        }
-    }
-}
+// MARK: - Settings View
 
 struct SettingsView: View {
     @ObservedObject var viewModel: CycleViewModel
@@ -69,6 +42,11 @@ struct SettingsView: View {
     @State private var showingNotificationSettings = false
     @State private var cycleLengthInput: Int = 28
     @State private var periodLengthInput: Int = 5
+    @State private var showingExportSheet = false
+    @State private var exportURL: URL?
+    @State private var showingShareSheet = false
+
+    private let exportService = DataExportService()
 
     var body: some View {
         NavigationStack {
@@ -176,6 +154,32 @@ struct SettingsView: View {
                         Text("Stats")
                     }
 
+                    // Data Section
+                    Section {
+                        Button {
+                            exportData()
+                        } label: {
+                            HStack {
+                                Image(systemName: "square.and.arrow.up")
+                                    .foregroundColor(.misoAccent)
+                                    .frame(width: 28)
+
+                                Text("Export Data")
+                                    .foregroundColor(.misoTextPrimary)
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.misoTextTertiary)
+                            }
+                        }
+                    } header: {
+                        Text("Your Data")
+                    } footer: {
+                        Text("Export all your cycle data as a JSON file.")
+                    }
+
                     // Privacy Section
                     Section {
                         HStack {
@@ -234,12 +238,37 @@ struct SettingsView: View {
             .sheet(isPresented: $showingNotificationSettings) {
                 NotificationSettingsView(cycleViewModel: viewModel)
             }
+            .sheet(isPresented: $showingShareSheet) {
+                if let url = exportURL {
+                    ShareSheet(items: [url])
+                }
+            }
             .onAppear {
                 cycleLengthInput = viewModel.averageCycleLength
                 periodLengthInput = Int(viewModel.userSettings?.averagePeriodLength ?? 5)
             }
         }
     }
+
+    private func exportData() {
+        do {
+            exportURL = try exportService.exportToFile()
+            showingShareSheet = true
+        } catch {
+            print("Export error: \(error)")
+        }
+    }
+}
+
+// MARK: - Share Sheet
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 #Preview {
