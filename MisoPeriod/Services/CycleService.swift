@@ -85,7 +85,7 @@ class CycleService: ObservableObject {
         let targetDate = date.startOfDay
 
         // First, check if there's an existing cycle that starts on this exact date
-        let allCycles = try fetchAllCycles()
+        var allCycles = try fetchAllCycles()
 
         for cycle in allCycles {
             guard let cycleStart = cycle.startDate else { continue }
@@ -112,8 +112,12 @@ class CycleService: ObservableObject {
         if let oldestCycle = allCycles.last,
            let oldestStart = oldestCycle.startDate,
            targetDate < oldestStart {
-            // Create a new historical cycle
-            return try createHistoricalCycle(startDate: targetDate)
+            // Create a new historical cycle and calculate its length
+            let newCycle = try createHistoricalCycle(startDate: targetDate)
+            // The cycle length is the days until the next cycle starts
+            newCycle.cycleLength = Int16(targetDate.daysBetween(oldestStart))
+            try saveContext()
+            return newCycle
         }
 
         // Check if this could be a NEW cycle (more than 18 days after last cycle start)
@@ -122,18 +126,18 @@ class CycleService: ObservableObject {
             let daysSinceLastCycle = newestStart.daysBetween(targetDate)
 
             if daysSinceLastCycle >= 18 {
-                // This is likely a new cycle
-                // Mark the old cycle as complete
-                if newestCycle.isActive {
-                    newestCycle.isActive = false
-                    newestCycle.cycleLength = Int16(daysSinceLastCycle)
-                }
+                // Mark the old cycle as complete with calculated length
+                newestCycle.cycleLength = Int16(daysSinceLastCycle)
+                newestCycle.isActive = false
 
-                // Create a new active cycle
+                // Determine if this should be active (is it the most recent/current period?)
+                let isCurrentPeriod = targetDate.daysBetween(Date()) <= 7
+
+                // Create a new cycle
                 let newCycle = Cycle(context: viewContext)
                 newCycle.id = UUID()
                 newCycle.startDate = targetDate
-                newCycle.isActive = true
+                newCycle.isActive = isCurrentPeriod
 
                 let settings = try fetchOrCreateUserSettings()
                 updateFertilityDates(for: newCycle, cycleLength: Int(settings.averageCycleLength))
@@ -145,11 +149,55 @@ class CycleService: ObservableObject {
 
         // No existing cycles at all - create the first one
         if allCycles.isEmpty {
-            return try createHistoricalCycle(startDate: targetDate)
+            // Determine if this should be active
+            let isCurrentPeriod = targetDate.daysBetween(Date()) <= 7
+            let newCycle = Cycle(context: viewContext)
+            newCycle.id = UUID()
+            newCycle.startDate = targetDate.startOfDay
+            newCycle.isActive = isCurrentPeriod
+
+            let settings = try fetchOrCreateUserSettings()
+            updateFertilityDates(for: newCycle, cycleLength: Int(settings.averageCycleLength))
+
+            try saveContext()
+            return newCycle
         }
 
         // Default: associate with the most recent cycle
         return allCycles.first!
+    }
+
+    /// Recalculate cycle lengths for all cycles based on their sequence
+    func recalculateCycleLengths() throws {
+        let allCycles = try fetchAllCycles() // sorted by startDate descending
+
+        // Go through cycles from oldest to newest and calculate lengths
+        for i in stride(from: allCycles.count - 1, through: 1, by: -1) {
+            let olderCycle = allCycles[i]
+            let newerCycle = allCycles[i - 1]
+
+            guard let olderStart = olderCycle.startDate,
+                  let newerStart = newerCycle.startDate else { continue }
+
+            let length = olderStart.daysBetween(newerStart)
+            if length > 0 && length < 60 { // Sanity check
+                olderCycle.cycleLength = Int16(length)
+            }
+        }
+
+        // The most recent cycle shouldn't have a length yet (it's ongoing)
+        // Unless it's historical and there's a newer active one
+
+        // Ensure the most recent cycle with period data is active
+        if let newestCycle = allCycles.first {
+            // Check if any cycle is active
+            let hasActive = allCycles.contains { $0.isActive }
+            if !hasActive {
+                newestCycle.isActive = true
+            }
+        }
+
+        try saveContext()
     }
 
     // MARK: - Daily Log Operations

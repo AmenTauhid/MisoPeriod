@@ -81,6 +81,9 @@ class CycleViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
+            // Recalculate cycle lengths to ensure predictions work
+            try cycleService.recalculateCycleLengths()
+
             currentCycle = try cycleService.fetchActiveCycle()
             recentCycles = try cycleService.fetchCycles(limit: 6)
             todayLog = try cycleService.fetchDailyLog(for: Date())

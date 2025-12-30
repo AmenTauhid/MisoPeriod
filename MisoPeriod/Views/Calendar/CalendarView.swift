@@ -4,7 +4,9 @@ struct MisoCalendarView: View {
     @StateObject private var viewModel = CalendarViewModel()
     @ObservedObject var cycleViewModel: CycleViewModel
     @State private var showingDayDetail = false
-    @State private var showingLogSheet = false
+    @State private var showingLogOptions = false
+    @State private var showingPeriodEntry = false
+    @State private var showingDeleteLog = false
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
 
@@ -39,6 +41,26 @@ struct MisoCalendarView: View {
             .navigationTitle("Calendar")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        Button {
+                            showingPeriodEntry = true
+                        } label: {
+                            Label("Log Period", systemImage: "calendar.badge.plus")
+                        }
+
+                        Button(role: .destructive) {
+                            showingDeleteLog = true
+                        } label: {
+                            Label("Delete Log", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(.misoPrimary)
+                    }
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Today") {
                         viewModel.goToToday()
@@ -61,6 +83,12 @@ struct MisoCalendarView: View {
                         }
                     )
                 }
+            }
+            .sheet(isPresented: $showingPeriodEntry) {
+                PeriodEntryView(viewModel: cycleViewModel, isPresented: $showingPeriodEntry)
+            }
+            .sheet(isPresented: $showingDeleteLog) {
+                DeleteLogView(viewModel: cycleViewModel, isPresented: $showingDeleteLog)
             }
             .refreshable {
                 await viewModel.refresh()
@@ -227,6 +255,7 @@ struct DayDetailSheet: View {
     let onDismiss: () -> Void
 
     @State private var showingEditLog = false
+    @State private var showingDeleteConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -262,10 +291,29 @@ struct DayDetailSheet: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(log != nil ? "Edit" : "Log") {
-                        showingEditLog = true
+                    if log != nil {
+                        Menu {
+                            Button {
+                                showingEditLog = true
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+
+                            Button(role: .destructive) {
+                                showingDeleteConfirmation = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .foregroundColor(.misoPrimary)
+                        }
+                    } else {
+                        Button("Log") {
+                            showingEditLog = true
+                        }
+                        .foregroundColor(.misoPrimary)
                     }
-                    .foregroundColor(.misoPrimary)
                 }
             }
             .sheet(isPresented: $showingEditLog) {
@@ -274,6 +322,19 @@ struct DayDetailSheet: View {
                     isPresented: $showingEditLog,
                     initialDate: date
                 )
+            }
+            .confirmationDialog("Delete this log?", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
+                Button("Delete", role: .destructive) {
+                    if let log = log {
+                        Task {
+                            await cycleViewModel.deleteLog(log)
+                            onDismiss()
+                        }
+                    }
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("This action cannot be undone.")
             }
         }
     }
