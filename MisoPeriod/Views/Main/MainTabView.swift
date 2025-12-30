@@ -16,7 +16,7 @@ struct MainTabView: View {
                     }
                     .tag(0)
 
-                CalendarView(viewModel: cycleViewModel)
+                MisoCalendarView(cycleViewModel: cycleViewModel)
                     .tabItem {
                         Label("Calendar", systemImage: "calendar")
                     }
@@ -86,33 +86,6 @@ struct MainTabView: View {
 }
 
 // MARK: - Placeholder Views (to be implemented)
-
-struct CalendarView: View {
-    @ObservedObject var viewModel: CycleViewModel
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.misoBgPrimary.ignoresSafeArea()
-
-                VStack(spacing: 20) {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 60))
-                        .foregroundColor(.misoPrimary.opacity(0.5))
-
-                    Text("Calendar Coming Soon")
-                        .font(.misoTitle2)
-                        .foregroundColor(.misoTextSecondary)
-
-                    Text("Track your cycle visually")
-                        .font(.misoBody)
-                        .foregroundColor(.misoTextTertiary)
-                }
-            }
-            .navigationTitle("Calendar")
-        }
-    }
-}
 
 struct InsightsView: View {
     @ObservedObject var viewModel: CycleViewModel

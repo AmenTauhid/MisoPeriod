@@ -3,8 +3,10 @@ import SwiftUI
 struct DailyLogView: View {
     @ObservedObject var viewModel: CycleViewModel
     @Binding var isPresented: Bool
+    var initialDate: Date = Date()
 
     @State private var selectedDate = Date()
+    @State private var hasInitialized = false
     @State private var flowIntensity: FlowIntensity = .none
     @State private var mood: Int = 3
     @State private var energy: Int = 3
@@ -67,6 +69,10 @@ struct DailyLogView: View {
             }
         }
         .onAppear {
+            if !hasInitialized {
+                selectedDate = initialDate
+                hasInitialized = true
+            }
             loadExistingLog()
         }
         .overlay {
