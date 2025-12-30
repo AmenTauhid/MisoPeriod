@@ -85,7 +85,7 @@ class CycleService: ObservableObject {
         let targetDate = date.startOfDay
 
         // First, check if there's an existing cycle that starts on this exact date
-        var allCycles = try fetchAllCycles()
+        let allCycles = try fetchAllCycles()
 
         for cycle in allCycles {
             guard let cycleStart = cycle.startDate else { continue }

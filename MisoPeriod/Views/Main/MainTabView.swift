@@ -45,6 +45,7 @@ struct SettingsView: View {
     @State private var showingExportSheet = false
     @State private var exportURL: URL?
     @State private var showingShareSheet = false
+    @State private var showingPartnerShare = false
 
     private let exportService = DataExportService()
 
@@ -154,6 +155,32 @@ struct SettingsView: View {
                         Text("Stats")
                     }
 
+                    // Sharing Section
+                    Section {
+                        Button {
+                            showingPartnerShare = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "heart.circle.fill")
+                                    .foregroundColor(.pink)
+                                    .frame(width: 28)
+
+                                Text("Share with Partner")
+                                    .foregroundColor(.misoTextPrimary)
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.misoTextTertiary)
+                            }
+                        }
+                    } header: {
+                        Text("Partner Mode")
+                    } footer: {
+                        Text("Share your cycle summary via QR code or text.")
+                    }
+
                     // Data Section
                     Section {
                         Button {
@@ -242,6 +269,9 @@ struct SettingsView: View {
                 if let url = exportURL {
                     ShareSheet(items: [url])
                 }
+            }
+            .sheet(isPresented: $showingPartnerShare) {
+                PartnerShareView(viewModel: viewModel)
             }
             .onAppear {
                 cycleLengthInput = viewModel.averageCycleLength

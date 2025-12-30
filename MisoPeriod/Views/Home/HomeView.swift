@@ -5,6 +5,10 @@ struct HomeView: View {
     @StateObject private var predictionService = PredictionService()
     @State private var showingStartPeriod = false
     @State private var showingAlertDetail = false
+    @State private var showingStreakCelebration = false
+    @State private var celebrationTitle = ""
+    @State private var celebrationSubtitle = ""
+    @State private var showHearts = false
 
     var body: some View {
         NavigationStack {
@@ -16,6 +20,11 @@ struct HomeView: View {
                         // Greeting & Affirmation
                         greetingSection
 
+                        // Streak milestone banner
+                        if shouldShowStreakBanner {
+                            streakMilestoneBanner
+                        }
+
                         // Alert Banner (if any)
                         if let alert = predictionService.topAlert {
                             alertBanner(alert)
@@ -26,6 +35,11 @@ struct HomeView: View {
 
                         // Quick Actions
                         quickActionsSection
+
+                        // Period approaching heads up
+                        if let days = viewModel.daysUntilPeriod, days > 0 && days <= 3 && !viewModel.isOnPeriod {
+                            periodApproachingCard(daysUntil: days)
+                        }
 
                         // Prediction Card
                         if !viewModel.isOnPeriod {
@@ -54,6 +68,9 @@ struct HomeView: View {
                     }
                     .padding()
                 }
+
+                // Heart animation overlay
+                HeartAnimation(isActive: $showHearts)
             }
             .navigationTitle("MisoPeriod")
             .navigationBarTitleDisplayMode(.large)
@@ -76,39 +93,160 @@ struct HomeView: View {
         } message: {
             Text("Mark today as the first day of your period?")
         }
+        .celebrationOverlay(
+            isShowing: $showingStreakCelebration,
+            title: celebrationTitle,
+            subtitle: celebrationSubtitle,
+            icon: streakIcon,
+            color: .orange
+        )
+        .onChange(of: viewModel.loggingStreak) { oldValue, newValue in
+            checkStreakMilestone(oldValue: oldValue, newValue: newValue)
+        }
+    }
+
+    // MARK: - Streak Helpers
+    private var shouldShowStreakBanner: Bool {
+        viewModel.loggingStreak >= 7
+    }
+
+    private var streakIcon: String {
+        switch viewModel.loggingStreak {
+        case 7..<14: return "flame.fill"
+        case 14..<30: return "star.fill"
+        case 30..<60: return "trophy.fill"
+        default: return "crown.fill"
+        }
+    }
+
+    private func checkStreakMilestone(oldValue: Int, newValue: Int) {
+        let milestones = [3, 7, 14, 30, 60, 100]
+
+        for milestone in milestones {
+            if oldValue < milestone && newValue >= milestone {
+                celebrationTitle = "\(milestone) Day Streak!"
+                celebrationSubtitle = streakMessage(for: milestone)
+                showingStreakCelebration = true
+                break
+            }
+        }
+    }
+
+    private func streakMessage(for days: Int) -> String {
+        switch days {
+        case 3: return "You're building a great habit!"
+        case 7: return "A whole week of tracking. Amazing!"
+        case 14: return "Two weeks strong. You're incredible!"
+        case 30: return "One month! You're a tracking superstar!"
+        case 60: return "Two months of dedication. Wow!"
+        case 100: return "100 days! You're absolutely amazing!"
+        default: return "Keep up the great work!"
+        }
+    }
+
+    // MARK: - Streak Milestone Banner
+    private var streakMilestoneBanner: some View {
+        HStack(spacing: 12) {
+            StreakBadge(streak: viewModel.loggingStreak)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("You're on fire!")
+                    .font(.misoSubheadline.bold())
+                    .foregroundColor(.misoTextPrimary)
+
+                Text("\(viewModel.loggingStreak) day logging streak")
+                    .font(.misoCaption)
+                    .foregroundColor(.misoTextSecondary)
+            }
+
+            Spacer()
+
+            Button {
+                showHearts = true
+            } label: {
+                Image(systemName: "heart.fill")
+                    .foregroundColor(.pink)
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.orange.opacity(0.15), Color.yellow.opacity(0.1)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                )
+        )
     }
 
     // MARK: - Greeting Section
     private var greetingSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(greeting)
-                .font(.misoTitle2)
-                .foregroundColor(.misoTextPrimary)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(greeting)
+                    .font(.misoTitle2)
+                    .foregroundColor(.misoTextPrimary)
+
+                Spacer()
+
+                Text(viewModel.currentPhase.emoji)
+                    .font(.title2)
+            }
 
             Text(viewModel.currentAffirmation)
                 .font(.misoBody)
                 .foregroundColor(.misoTextSecondary)
                 .italic()
                 .transition(.opacity)
+                .id(viewModel.currentAffirmation) // For animation
+
+            // Self-care tip
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.caption)
+                    .foregroundColor(viewModel.currentPhase.color)
+
+                Text(viewModel.currentPhase.selfCareTip)
+                    .font(.misoCaption)
+                    .foregroundColor(.misoTextTertiary)
+            }
+            .padding(.top, 4)
+
+            // Tap hint
+            Text("Tap for a new message")
+                .font(.system(size: 10))
+                .foregroundColor(.misoTextTertiary.opacity(0.7))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(viewModel.currentPhase.backgroundColor)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(viewModel.currentPhase.color.opacity(0.2), lineWidth: 1)
+                )
         )
         .onTapGesture {
-            viewModel.showNewAffirmation()
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                viewModel.showNewAffirmation()
+            }
         }
     }
 
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
         switch hour {
-        case 5..<12: return "Good morning!"
-        case 12..<17: return "Good afternoon!"
-        case 17..<21: return "Good evening!"
-        default: return "Hello!"
+        case 5..<12: return "Good morning"
+        case 12..<17: return "Good afternoon"
+        case 17..<21: return "Good evening"
+        default: return "Sweet dreams"
         }
     }
 
@@ -227,30 +365,57 @@ struct HomeView: View {
     }
 
     private var periodActiveView: some View {
-        HStack {
-            Image(systemName: "drop.fill")
-                .foregroundColor(.misoPeriod)
+        VStack(spacing: 10) {
+            HStack {
+                Image(systemName: "drop.fill")
+                    .foregroundColor(.misoPeriod)
 
-            Text("Period in progress")
-                .font(.misoSubheadline)
-                .foregroundColor(.misoTextPrimary)
+                Text("Period in progress")
+                    .font(.misoSubheadline)
+                    .foregroundColor(.misoTextPrimary)
 
-            Spacer()
+                Spacer()
 
-            Button("End Period") {
-                Task {
-                    await viewModel.endPeriod()
-                    await predictionService.updatePredictions()
+                Button("End Period") {
+                    Task {
+                        await viewModel.endPeriod()
+                        await predictionService.updatePredictions()
+                    }
                 }
+                .font(.misoSubheadline.bold())
+                .foregroundColor(.misoPrimary)
             }
-            .font(.misoSubheadline.bold())
-            .foregroundColor(.misoPrimary)
+
+            HStack(spacing: 6) {
+                Image(systemName: "heart.fill")
+                    .font(.caption2)
+                    .foregroundColor(.pink.opacity(0.6))
+
+                Text(periodComfortMessage)
+                    .font(.misoCaption)
+                    .foregroundColor(.misoTextSecondary)
+                    .italic()
+            }
         }
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.misoPeriod.opacity(0.1))
         )
+    }
+
+    private var periodComfortMessage: String {
+        let messages = [
+            "Take care of yourself today",
+            "You're doing amazing",
+            "Rest when you need to",
+            "Be extra gentle with yourself",
+            "Hot drinks and cozy blankets",
+            "You've got this"
+        ]
+        // Use cycle day as seed for consistent message each day
+        let index = viewModel.cycleDay % messages.count
+        return messages[index]
     }
 
     // MARK: - Quick Actions
@@ -274,6 +439,79 @@ struct HomeView: View {
                 // Will trigger sheet from MainTabView
             }
         }
+    }
+
+    // MARK: - Period Approaching Card
+    private func periodApproachingCard(daysUntil: Int) -> some View {
+        let message: String = {
+            switch daysUntil {
+            case 1: return "Tomorrow might be the day! Stock up on your essentials."
+            case 2: return "Just a couple days away. Time to prepare your comfort kit!"
+            case 3: return "Your period is coming soon. Maybe grab some supplies?"
+            default: return "Your period is approaching."
+            }
+        }()
+
+        let tip: String = {
+            switch daysUntil {
+            case 1: return "Hot water bottle, snacks, and cozy clothes ready?"
+            case 2: return "Maybe schedule some lighter activities"
+            case 3: return "Good time to stock up on chocolate"
+            default: return "Take care of yourself"
+            }
+        }()
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "bell.badge.fill")
+                    .foregroundColor(.misoPrimary)
+                Text("Heads Up!")
+                    .font(.misoHeadline)
+                    .foregroundColor(.misoTextPrimary)
+                Spacer()
+
+                Text(daysUntil == 1 ? "Tomorrow" : "in \(daysUntil) days")
+                    .font(.misoCaption.bold())
+                    .foregroundColor(.misoPrimary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(Color.misoPrimary.opacity(0.15))
+                    )
+            }
+
+            Text(message)
+                .font(.misoBody)
+                .foregroundColor(.misoTextSecondary)
+
+            HStack(spacing: 6) {
+                Image(systemName: "heart.fill")
+                    .font(.caption)
+                    .foregroundColor(.pink.opacity(0.7))
+
+                Text(tip)
+                    .font(.misoCaption)
+                    .foregroundColor(.misoTextTertiary)
+                    .italic()
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.misoPrimary.opacity(0.08), Color.pink.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.misoPrimary.opacity(0.2), lineWidth: 1)
+                )
+        )
     }
 
     // MARK: - Prediction Card
