@@ -1,9 +1,76 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="1" systemVersion="11A491" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithCloudKit="false" userDefinedModelVersionIdentifier="">
-    <entity name="Item" representedClassName="Item" syncable="YES" codeGenerationType="class">
-        <attribute name="timestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="22758" systemVersion="24A335" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithCloudKit="false" userDefinedModelVersionIdentifier="">
+    <entity name="Cycle" representedClassName="Cycle" syncable="YES" codeGenerationType="class">
+        <attribute name="cycleLength" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="endDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="fertileWindowEnd" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="fertileWindowStart" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isActive" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="ovulationDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="periodLength" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="startDate" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="dailyLogs" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="DailyLog" inverseName="cycle" inverseEntity="DailyLog"/>
+        <relationship name="predictions" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Prediction" inverseName="cycle" inverseEntity="Prediction"/>
+    </entity>
+    <entity name="DailyLog" representedClassName="DailyLog" syncable="YES" codeGenerationType="class">
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="date" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="energy" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="exerciseMinutes" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="flowIntensity" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="intimacy" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="mood" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="notes" optional="YES" attributeType="String"/>
+        <attribute name="sleepQuality" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="temperature" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="waterIntake" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="cycle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cycle" inverseName="dailyLogs" inverseEntity="Cycle"/>
+        <relationship name="symptoms" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Symptom" inverseName="dailyLog" inverseEntity="Symptom"/>
+    </entity>
+    <entity name="NotificationSetting" representedClassName="NotificationSetting" syncable="YES" codeGenerationType="class">
+        <attribute name="daysBefore" attributeType="Integer 16" defaultValueString="1" usesScalarValueType="YES"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isEnabled" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="time" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="type" attributeType="String"/>
+    </entity>
+    <entity name="Prediction" representedClassName="Prediction" syncable="YES" codeGenerationType="class">
+        <attribute name="actualDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="confidence" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="predictedDate" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="symptomType" optional="YES" attributeType="String"/>
+        <attribute name="type" attributeType="String"/>
+        <attribute name="wasAccurate" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <relationship name="cycle" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Cycle" inverseName="predictions" inverseEntity="Cycle"/>
+    </entity>
+    <entity name="Symptom" representedClassName="Symptom" syncable="YES" codeGenerationType="class">
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="severity" attributeType="Integer 16" defaultValueString="1" usesScalarValueType="YES"/>
+        <attribute name="timestamp" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="type" attributeType="String"/>
+        <relationship name="dailyLog" maxCount="1" deletionRule="Nullify" destinationEntity="DailyLog" inverseName="symptoms" inverseEntity="DailyLog"/>
+    </entity>
+    <entity name="UserSettings" representedClassName="UserSettings" syncable="YES" codeGenerationType="class">
+        <attribute name="averageCycleLength" attributeType="Integer 16" defaultValueString="28" usesScalarValueType="YES"/>
+        <attribute name="averagePeriodLength" attributeType="Integer 16" defaultValueString="5" usesScalarValueType="YES"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="lastPredictionUpdate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="loggingStreak" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="onboardingCompleted" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
     </entity>
     <elements>
-        <element name="Item" positionX="-63" positionY="-18" width="128" height="44"/>
+        <element name="Cycle" positionX="-63" positionY="-18" width="128" height="209"/>
+        <element name="DailyLog" positionX="160" positionY="-18" width="128" height="254"/>
+        <element name="NotificationSetting" positionX="360" positionY="180" width="128" height="104"/>
+        <element name="Prediction" positionX="-270" positionY="90" width="128" height="164"/>
+        <element name="Symptom" positionX="360" positionY="-18" width="128" height="104"/>
+        <element name="UserSettings" positionX="-63" positionY="200" width="128" height="134"/>
     </elements>
 </model>

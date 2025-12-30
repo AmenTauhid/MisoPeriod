@@ -1,10 +1,3 @@
-//
-//  MisoPeriodApp.swift
-//  MisoPeriod
-//
-//  Created by Ayman Tauhid on 2025-12-29.
-//
-
 import SwiftUI
 import CoreData
 
@@ -14,7 +7,7 @@ struct MisoPeriodApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainTabView()
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
         }
     }
